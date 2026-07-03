@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">Board Game Tracker</string>
+
+    <!--Register Fields-->
+    <string name="title_register">Register</string>
+    <string name="hint_full_name">Full Name</string>
+    <string name="hint_email">Email</string>
+    <string name="hint_password">Password</string>
+    <string name="btn_register">Sign Up Right Here!</string>
+    <string name="btn_go_to_login">Already Signed In? Go to Login</string>
 </resources>
