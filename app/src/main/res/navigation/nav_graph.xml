@@ -10,6 +10,21 @@
         android:id="@+id/registerFragment"
         android:name="com.example.boardgametracker.ui.RegisterFragment"
         android:label="RegisterFragment"
-        tools:layout="@layout/fragment_register" />
+        tools:layout="@layout/fragment_register">
+        <action
+            android:id="@+id/action_registerFragment_to_loginFragment"
+            app:destination="@id/loginFragment" />
+    </fragment>
+
+    <!-- Login Screen Destination -->
+    <fragment
+        android:id="@+id/loginFragment"
+        android:name="com.example.boardgametracker.ui.LoginFragment"
+        android:label="LoginFragment"
+        tools:layout="@layout/fragment_login">
+        <action
+            android:id="@+id/action_loginFragment_to_registerFragment"
+            app:destination="@id/registerFragment" />
+    </fragment>
 
 </navigation>
