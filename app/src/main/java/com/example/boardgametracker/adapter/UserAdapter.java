@@ -18,7 +18,7 @@ public class UserAdapter extends RecyclerView.Adapter<UserAdapter.UserViewHolder
 
     public void setUsers(List<UserProfile> users) {
         this.userList = users;
-        notifyDataSetChanged(); // Updates the RecyclerView
+        notifyDataSetChanged();
     }
 
     @NonNull
@@ -49,15 +49,7 @@ public class UserAdapter extends RecyclerView.Adapter<UserAdapter.UserViewHolder
 
         public void bind(UserProfile user) {
             binding.tvUserName.setText(user.getFullName());
-
-            // Calculate total wins from the map
-            int totalWins = 0;
-            if (user.getGameWins() != null) {
-                for (int wins : user.getGameWins().values()) {
-                    totalWins += wins;
-                }
-            }
-            binding.tvTotalWins.setText("Wins: " + totalWins);
+            binding.tvTotalWins.setText("Wins: " + user.getTotalWins());
         }
     }
 }

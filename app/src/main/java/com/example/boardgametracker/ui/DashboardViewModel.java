@@ -4,8 +4,12 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
+import com.example.boardgametracker.model.Game;
 import com.example.boardgametracker.model.UserProfile;
+import com.example.boardgametracker.model.Win;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.ArrayList;
@@ -13,8 +17,11 @@ import java.util.List;
 
 public class DashboardViewModel extends ViewModel {
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
+
     private final MutableLiveData<List<UserProfile>> usersLiveData = new MutableLiveData<>();
     private final MutableLiveData<String> errorLiveData = new MutableLiveData<>();
+    private final MutableLiveData<List<Game>> gamesLiveData = new MutableLiveData<>();
+    private final MutableLiveData<List<Win>> gameWinsLiveData = new MutableLiveData<>();
 
     public LiveData<List<UserProfile>> getUsersLiveData() {
         return usersLiveData;
@@ -24,22 +31,90 @@ public class DashboardViewModel extends ViewModel {
         return errorLiveData;
     }
 
-    public void fetchUsersRealTime() {
-        // Listening to the "users" collection in real-time
-        db.collection("users").addSnapshotListener((value, error) -> {
-            if (error != null) {
-                errorLiveData.setValue("Error fetching data: " + error.getMessage());
-                return;
-            }
+    public LiveData<List<Game>> getGamesLiveData() {
+        return gamesLiveData;
+    }
 
-            List<UserProfile> userList = new ArrayList<>();
+    public LiveData<List<Win>> getGameWinsLiveData() {
+        return gameWinsLiveData;
+    }
+
+    // General leaderboard, sorted highest wins first
+    public void fetchUsersRealTime() {
+        db.collection("users")
+                .orderBy("totalWins", Query.Direction.DESCENDING)
+                .addSnapshotListener((value, error) -> {
+                    if (error != null) {
+                        errorLiveData.setValue("Error fetching data: " + error.getMessage());
+                        return;
+                    }
+                    List<UserProfile> userList = new ArrayList<>();
+                    if (value != null) {
+                        for (QueryDocumentSnapshot doc : value) {
+                            UserProfile user = doc.toObject(UserProfile.class);
+                            userList.add(user);
+                        }
+                        usersLiveData.setValue(userList);
+                    }
+                });
+    }
+
+    public void fetchGames() {
+        db.collection("games").addSnapshotListener((value, error) -> {
+            List<Game> gameList = new ArrayList<>();
             if (value != null) {
                 for (QueryDocumentSnapshot doc : value) {
-                    UserProfile user = doc.toObject(UserProfile.class);
-                    userList.add(user);
+                    Game game = doc.toObject(Game.class);
+                    game.setId(doc.getId());
+                    gameList.add(game);
                 }
-                usersLiveData.setValue(userList);
+                gamesLiveData.setValue(gameList);
             }
         });
+    }
+
+    // Per-game leaderboard: every win logged for a specific game
+    public void fetchWinsForGame(String gameId) {
+        db.collection("wins")
+                .whereEqualTo("gameId", gameId)
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .addSnapshotListener((value, error) -> {
+                    List<Win> winList = new ArrayList<>();
+                    if (value != null) {
+                        for (QueryDocumentSnapshot doc : value) {
+                            winList.add(doc.toObject(Win.class));
+                        }
+                        gameWinsLiveData.setValue(winList);
+                    }
+                });
+    }
+
+    public void recordWin(String userId, String gameName) {
+        db.collection("games").whereEqualTo("name", gameName).get()
+                .addOnSuccessListener(query -> {
+                    if (!query.isEmpty()) {
+                        String gameId = query.getDocuments().get(0).getId();
+                        logWin(userId, gameId, gameName);
+                    } else {
+                        db.collection("games").add(new Game(null, gameName))
+                                .addOnSuccessListener(docRef -> logWin(userId, docRef.getId(), gameName))
+                                .addOnFailureListener(e ->
+                                        errorLiveData.setValue("Failed to create game: " + e.getMessage()));
+                    }
+                })
+                .addOnFailureListener(e ->
+                        errorLiveData.setValue("Failed to look up game: " + e.getMessage()));
+    }
+
+    private void logWin(String userId, String gameId, String gameName) {
+        db.collection("users").document(userId)
+                .update("totalWins", FieldValue.increment(1))
+                .addOnFailureListener(e ->
+                        errorLiveData.setValue("Failed to update total: " + e.getMessage()));
+
+        Win win = new Win(userId, gameId, gameName);
+        db.collection("wins").add(win)
+                .addOnFailureListener(e ->
+                        errorLiveData.setValue("Failed to log win: " + e.getMessage()));
     }
 }
