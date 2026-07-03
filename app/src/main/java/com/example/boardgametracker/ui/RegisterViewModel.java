@@ -3,6 +3,8 @@ package com.example.boardgametracker.ui;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.example.boardgametracker.model.UserProfile;
 import com.google.firebase.auth.FirebaseAuth;
@@ -27,8 +29,9 @@ public class RegisterViewModel extends ViewModel {
         mAuth.createUserWithEmailAndPassword(email, password)
                 .addOnSuccessListener(authResult -> {
                     String uid = authResult.getUser().getUid();
+                    Map<String, Integer> initialGameWins = new HashMap<>();
 
-                    UserProfile newUser = new UserProfile(uid, fullName, email, 0);
+                    UserProfile newUser = new UserProfile(uid, fullName, email, initialGameWins);
 
                     db.collection("users").document(uid).set(newUser)
                             .addOnSuccessListener(aVoid -> registrationStatus.setValue("SUCCESS"))

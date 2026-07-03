@@ -1,19 +1,25 @@
 package com.example.boardgametracker.model;
 
+import java.util.Map;
+
 public class UserProfile {
     private String uid;
     private String fullName;
     private String email;
-    private int wins;
 
+    // Game name - String, Amount of Wins - Integer
+    private Map<String, Integer> gameWins;
+
+    // Required empty constructor for Firebase Serialization
     public UserProfile() {
     }
 
-    public UserProfile(String uid, String fullName, String email, int wins) {
+    // Updated constructor
+    public UserProfile(String uid, String fullName, String email, Map<String, Integer> gameWins) {
         this.uid = uid;
         this.fullName = fullName;
         this.email = email;
-        this.wins = wins;
+        this.gameWins = gameWins;
     }
 
     public String getUid() {
@@ -40,11 +46,11 @@ public class UserProfile {
         this.email = email;
     }
 
-    public int getWins() {
-        return wins;
+    public Map<String, Integer> getGameWins() {
+        return gameWins;
     }
 
-    public void setWins(int wins) {
-        this.wins = wins;
+    public void setGameWins(Map<String, Integer> gameWins) {
+        this.gameWins = gameWins;
     }
 }

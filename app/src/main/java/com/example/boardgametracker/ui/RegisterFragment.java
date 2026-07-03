@@ -33,7 +33,8 @@ public class RegisterFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         viewModel.getRegistrationStatus().observe(getViewLifecycleOwner(), status -> {
             if (status.equals("SUCCESS")) {
-                Toast.makeText(requireContext(), "Registered Successfully!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), "Registration Successful!", Toast.LENGTH_SHORT).show();
+                Navigation.findNavController(requireView()).navigate(R.id.action_registerFragment_to_dashboardFragment);
             } else {
                 Toast.makeText(requireContext(), status, Toast.LENGTH_LONG).show();
             }

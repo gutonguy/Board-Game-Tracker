@@ -36,7 +36,7 @@ public class LoginFragment extends Fragment {
         viewModel.getLoginStatus().observe(getViewLifecycleOwner(), status -> {
             if (status.equals("SUCCESS")) {
                 Toast.makeText(requireContext(), "Login Successful!", Toast.LENGTH_SHORT).show();
-                // TODO: Add navigation to main app screen here
+                Navigation.findNavController(requireView()).navigate(R.id.action_loginFragment_to_dashboardFragment);
             } else {
                 Toast.makeText(requireContext(), status, Toast.LENGTH_LONG).show();
             }
