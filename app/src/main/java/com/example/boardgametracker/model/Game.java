@@ -1,5 +1,7 @@
 package com.example.boardgametracker.model;
 
+import com.google.firebase.firestore.Exclude;
+
 public class Game {
     private String id;
     private String name;
@@ -12,6 +14,7 @@ public class Game {
         this.name = name;
     }
 
+    @Exclude
     public String getId() {
         return id;
     }

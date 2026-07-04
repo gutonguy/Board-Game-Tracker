@@ -23,8 +23,10 @@ public class DashboardViewModel extends ViewModel {
     private final MutableLiveData<String> errorLiveData = new MutableLiveData<>();
     private final MutableLiveData<List<Game>> gamesLiveData = new MutableLiveData<>();
     private final MutableLiveData<List<Win>> gameWinsLiveData = new MutableLiveData<>();
+    private final MutableLiveData<List<Win>> allWinsLiveData = new MutableLiveData<>();
 
     private ListenerRegistration winsListenerRegistration;
+    private ListenerRegistration allWinsListenerRegistration;
 
     public LiveData<List<UserProfile>> getUsersLiveData() {
         return usersLiveData;
@@ -42,7 +44,10 @@ public class DashboardViewModel extends ViewModel {
         return gameWinsLiveData;
     }
 
-    // General leaderboard, sorted highest wins first
+    public LiveData<List<Win>> getAllWinsLiveData() {
+        return allWinsLiveData;
+    }
+
     public void fetchUsersRealTime() {
         db.collection("users")
                 .orderBy("totalWins", Query.Direction.DESCENDING)
@@ -54,8 +59,7 @@ public class DashboardViewModel extends ViewModel {
                     List<UserProfile> userList = new ArrayList<>();
                     if (value != null) {
                         for (QueryDocumentSnapshot doc : value) {
-                            UserProfile user = doc.toObject(UserProfile.class);
-                            userList.add(user);
+                            userList.add(doc.toObject(UserProfile.class));
                         }
                         usersLiveData.setValue(userList);
                     }
@@ -76,7 +80,7 @@ public class DashboardViewModel extends ViewModel {
         });
     }
 
-    // Per-game leaderboard: every win logged for a specific game
+    // Every win for one specific game — used for both its ranking and its history view
     public void fetchWinsForGame(String gameId) {
         if (winsListenerRegistration != null) {
             winsListenerRegistration.remove();
@@ -85,6 +89,10 @@ public class DashboardViewModel extends ViewModel {
                 .whereEqualTo("gameId", gameId)
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .addSnapshotListener((value, error) -> {
+                    if (error != null) {
+                        errorLiveData.setValue("Error fetching game wins: " + error.getMessage());
+                        return;
+                    }
                     List<Win> winList = new ArrayList<>();
                     if (value != null) {
                         for (QueryDocumentSnapshot doc : value) {
@@ -95,8 +103,28 @@ public class DashboardViewModel extends ViewModel {
                 });
     }
 
-    // Records a win: resolves the game by name (creating it if new),
-    // then atomically bumps the user's total and logs the event.
+    // Every win across every game — used for the "All Games" history view
+    public void fetchAllWinsRealTime() {
+        if (allWinsListenerRegistration != null) {
+            allWinsListenerRegistration.remove();
+        }
+        allWinsListenerRegistration = db.collection("wins")
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .addSnapshotListener((value, error) -> {
+                    if (error != null) {
+                        errorLiveData.setValue("Error fetching history: " + error.getMessage());
+                        return;
+                    }
+                    List<Win> winList = new ArrayList<>();
+                    if (value != null) {
+                        for (QueryDocumentSnapshot doc : value) {
+                            winList.add(doc.toObject(Win.class));
+                        }
+                    }
+                    allWinsLiveData.setValue(winList);
+                });
+    }
+
     public void recordWin(String userId, String gameName) {
         db.collection("games").whereEqualTo("name", gameName).get()
                 .addOnSuccessListener(query -> {
@@ -131,6 +159,9 @@ public class DashboardViewModel extends ViewModel {
         super.onCleared();
         if (winsListenerRegistration != null) {
             winsListenerRegistration.remove();
+        }
+        if (allWinsListenerRegistration != null) {
+            allWinsListenerRegistration.remove();
         }
     }
 }

@@ -17,6 +17,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.Navigation;
 
 import com.example.boardgametracker.R;
+import com.example.boardgametracker.adapter.HistoryAdapter;
 import com.example.boardgametracker.adapter.LeaderboardAdapter;
 import com.example.boardgametracker.databinding.FragmentDashboardBinding;
 import com.example.boardgametracker.model.Game;
@@ -32,13 +33,20 @@ import java.util.Map;
 
 public class DashboardFragment extends Fragment {
 
+    private enum ViewMode { RANKINGS, HISTORY }
+
     private FragmentDashboardBinding binding;
     private DashboardViewModel viewModel;
-    private LeaderboardAdapter adapter;
+    private LeaderboardAdapter leaderboardAdapter;
+    private HistoryAdapter historyAdapter;
 
     private List<UserProfile> cachedUsers = new ArrayList<>();
     private List<Game> cachedGames = new ArrayList<>();
-    private String selectedGameId = null;
+    private List<Win> cachedGameWins = new ArrayList<>();
+    private List<Win> cachedAllWins = new ArrayList<>();
+
+    private String selectedGameId = null; // null = "All Games"
+    private ViewMode viewMode = ViewMode.RANKINGS;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -50,21 +58,30 @@ public class DashboardFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        adapter = new LeaderboardAdapter();
-        binding.recyclerViewUsers.setAdapter(adapter);
+        leaderboardAdapter = new LeaderboardAdapter();
+        historyAdapter = new HistoryAdapter(this::resolveUserName);
+        binding.recyclerViewUsers.setAdapter(leaderboardAdapter);
 
         viewModel = new ViewModelProvider(this).get(DashboardViewModel.class);
 
         viewModel.getUsersLiveData().observe(getViewLifecycleOwner(), users -> {
             cachedUsers = users;
-            if (selectedGameId == null) {
-                renderGeneralLeaderboard();
+            if (viewMode == ViewMode.RANKINGS && selectedGameId == null) {
+                renderRankings();
             }
         });
 
         viewModel.getGameWinsLiveData().observe(getViewLifecycleOwner(), wins -> {
+            cachedGameWins = wins;
             if (selectedGameId != null) {
-                renderGameLeaderboard(wins);
+                renderCurrentView();
+            }
+        });
+
+        viewModel.getAllWinsLiveData().observe(getViewLifecycleOwner(), wins -> {
+            cachedAllWins = wins;
+            if (selectedGameId == null) {
+                renderCurrentView();
             }
         });
 
@@ -79,6 +96,19 @@ public class DashboardFragment extends Fragment {
 
         viewModel.fetchUsersRealTime();
         viewModel.fetchGames();
+        viewModel.fetchAllWinsRealTime();
+
+        binding.btnShowRankings.setOnClickListener(v -> {
+            viewMode = ViewMode.RANKINGS;
+            binding.recyclerViewUsers.setAdapter(leaderboardAdapter);
+            renderCurrentView();
+        });
+
+        binding.btnShowHistory.setOnClickListener(v -> {
+            viewMode = ViewMode.HISTORY;
+            binding.recyclerViewUsers.setAdapter(historyAdapter);
+            renderCurrentView();
+        });
 
         binding.fabAddWin.setOnClickListener(v -> showAddWinDialog());
 
@@ -105,7 +135,7 @@ public class DashboardFragment extends Fragment {
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 if (position == 0) {
                     selectedGameId = null;
-                    renderGeneralLeaderboard();
+                    renderCurrentView();
                 } else {
                     Game selectedGame = cachedGames.get(position - 1);
                     selectedGameId = selectedGame.getId();
@@ -115,19 +145,34 @@ public class DashboardFragment extends Fragment {
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
+                // no-op
             }
         });
     }
 
-    private void renderGeneralLeaderboard() {
+    // Re-renders whatever should currently be on screen, based on mode + game filter
+    private void renderCurrentView() {
+        if (viewMode == ViewMode.RANKINGS) {
+            if (selectedGameId == null) {
+                renderRankings();
+            } else {
+                renderGameRankings(cachedGameWins);
+            }
+        } else {
+            List<Win> source = selectedGameId == null ? cachedAllWins : cachedGameWins;
+            historyAdapter.setWins(source);
+        }
+    }
+
+    private void renderRankings() {
         List<LeaderboardEntry> entries = new ArrayList<>();
         for (UserProfile user : cachedUsers) {
             entries.add(new LeaderboardEntry(user.getFullName(), user.getTotalWins()));
         }
-        adapter.setEntries(entries);
+        leaderboardAdapter.setEntries(entries);
     }
 
-    private void renderGameLeaderboard(List<Win> wins) {
+    private void renderGameRankings(List<Win> wins) {
         Map<String, Integer> countsByUserId = new HashMap<>();
         for (Win win : wins) {
             countsByUserId.put(win.getUserId(), countsByUserId.getOrDefault(win.getUserId(), 0) + 1);
@@ -135,12 +180,11 @@ public class DashboardFragment extends Fragment {
 
         List<LeaderboardEntry> entries = new ArrayList<>();
         for (Map.Entry<String, Integer> count : countsByUserId.entrySet()) {
-            String name = resolveUserName(count.getKey());
-            entries.add(new LeaderboardEntry(name, count.getValue()));
+            entries.add(new LeaderboardEntry(resolveUserName(count.getKey()), count.getValue()));
         }
 
         entries.sort((a, b) -> b.getWins() - a.getWins());
-        adapter.setEntries(entries);
+        leaderboardAdapter.setEntries(entries);
     }
 
     private String resolveUserName(String userId) {
