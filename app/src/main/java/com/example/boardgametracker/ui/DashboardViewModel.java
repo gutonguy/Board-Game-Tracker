@@ -9,6 +9,7 @@ import com.example.boardgametracker.model.UserProfile;
 import com.example.boardgametracker.model.Win;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
@@ -22,6 +23,8 @@ public class DashboardViewModel extends ViewModel {
     private final MutableLiveData<String> errorLiveData = new MutableLiveData<>();
     private final MutableLiveData<List<Game>> gamesLiveData = new MutableLiveData<>();
     private final MutableLiveData<List<Win>> gameWinsLiveData = new MutableLiveData<>();
+
+    private ListenerRegistration winsListenerRegistration;
 
     public LiveData<List<UserProfile>> getUsersLiveData() {
         return usersLiveData;
@@ -75,7 +78,10 @@ public class DashboardViewModel extends ViewModel {
 
     // Per-game leaderboard: every win logged for a specific game
     public void fetchWinsForGame(String gameId) {
-        db.collection("wins")
+        if (winsListenerRegistration != null) {
+            winsListenerRegistration.remove();
+        }
+        winsListenerRegistration = db.collection("wins")
                 .whereEqualTo("gameId", gameId)
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .addSnapshotListener((value, error) -> {
@@ -84,11 +90,13 @@ public class DashboardViewModel extends ViewModel {
                         for (QueryDocumentSnapshot doc : value) {
                             winList.add(doc.toObject(Win.class));
                         }
-                        gameWinsLiveData.setValue(winList);
                     }
+                    gameWinsLiveData.setValue(winList);
                 });
     }
 
+    // Records a win: resolves the game by name (creating it if new),
+    // then atomically bumps the user's total and logs the event.
     public void recordWin(String userId, String gameName) {
         db.collection("games").whereEqualTo("name", gameName).get()
                 .addOnSuccessListener(query -> {
@@ -116,5 +124,13 @@ public class DashboardViewModel extends ViewModel {
         db.collection("wins").add(win)
                 .addOnFailureListener(e ->
                         errorLiveData.setValue("Failed to log win: " + e.getMessage()));
+    }
+
+    @Override
+    protected void onCleared() {
+        super.onCleared();
+        if (winsListenerRegistration != null) {
+            winsListenerRegistration.remove();
+        }
     }
 }
